@@ -1,2 +1,2 @@
 # Tinexplorer
-Map a filesystem into a GraphQL API
+Filesystem GraphQL API
