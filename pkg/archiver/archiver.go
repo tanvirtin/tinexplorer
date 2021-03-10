@@ -5,11 +5,24 @@ import (
 	"fmt"
     "path/filepath"
     "os"
+    "path"
+    "runtime"
     _ "github.com/mattn/go-sqlite3"
 )
 
+func getRootDir() string {
+    _, b, _, _ := runtime.Caller(0)
+    d := path.Join(path.Dir(b))
+    return filepath.Dir(d)
+}
+
 func InitializeDatabase() error {
-    db, err := sql.Open("sqlite3", "./assets/tinexplore.db")
+    rootDir := getRootDir();
+    pathToDb := filepath.Join(rootDir, "../assets/tinexplore.db")
+
+    os.Remove(pathToDb);
+
+    db, err := sql.Open("sqlite3", pathToDb)
 
     if err != nil {
         return err
@@ -46,11 +59,13 @@ func Archive(path string) error {
         if err != nil {
             return err
         }
+
         if (fileInfo.IsDir()) {
             fmt.Printf("File -> %s -> %+v\n\n", path, fileInfo)
         } else {
             fmt.Printf("Directory -> %s -> %+v\n\n", path, fileInfo)
         }
+
         return nil
     })
 

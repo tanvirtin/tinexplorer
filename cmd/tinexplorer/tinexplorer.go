@@ -2,6 +2,7 @@ package main
 
 import (
     "os"
+    "log"
     "path/filepath"
     "github.com/tanvirtin/tinexplorer/pkg/archiver"
     "github.com/akamensky/argparse"
@@ -9,7 +10,7 @@ import (
 
 func checkErr(err error) {
     if err != nil {
-        panic(err)
+        log.Fatal(err)
     }
 }
 
