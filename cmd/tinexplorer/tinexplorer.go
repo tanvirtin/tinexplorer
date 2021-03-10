@@ -1,12 +1,17 @@
 package main
 
 import (
-    "fmt"
     "os"
     "path/filepath"
     "github.com/tanvirtin/tinexplorer/pkg/archiver"
     "github.com/akamensky/argparse"
 )
+
+func checkErr(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
 
 func getPath() (string, error) {
 	parser := argparse.NewParser("tinexplorer", "Filesystem GraphQL API ☁️")
@@ -28,11 +33,11 @@ func getPath() (string, error) {
 
 func main() {
     path, err := getPath()
+    checkErr(err)
 
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
+    err = archiver.InitializeDatabase()
+    checkErr(err)
 
-    archiver.Archive(path);
+    err = archiver.Archive(path);
+    checkErr(err)
 }
