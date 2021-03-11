@@ -1,7 +1,6 @@
 package archiver
 
 import (
-	"fmt"
     "path/filepath"
     "os"
     "path"
@@ -10,14 +9,19 @@ import (
     "gorm.io/driver/sqlite"
     "github.com/tanvirtin/tinexplorer/api/models"
     "time"
+    "log"
 )
 
-func Archive(rootPath string) error {
+func getDbPath() string {
     _, b, _, _ := runtime.Caller(0)
     d := path.Join(path.Dir(b))
     rootDir := filepath.Dir(d)
     pathToDb := filepath.Join(rootDir, "../assets/tinexplore.db")
+    return pathToDb
+}
 
+func Archive(rootPath string) error {
+    pathToDb := getDbPath()
     os.Remove(pathToDb);
 
     db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{})
@@ -29,43 +33,39 @@ func Archive(rootPath string) error {
     db.AutoMigrate(&models.File{})
  
     var id uint64 = 0
+    channel := make(chan bool, 100)
     filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
 
-        id += 1
+        id++
 
-        if (fileInfo.IsDir()) {
-            file := models.File{
-                ID: id,
-                Name: fileInfo.Name(),
-                Path: path,
-                Extension: filepath.Ext(path),
-                ParentDirectory: filepath.Dir(path),
-                Size: fileInfo.Size(),
-                IsDirectory: fileInfo.IsDir(),
-                CreatedDate: fileInfo.ModTime().Unix(),
-                PopulatedDate: time.Now().Unix(),
-            }
-            db.Create(&file)
-        } else {
-             folder := models.File{
-                ID: id,
-                Name: fileInfo.Name(),
-                Path: path,
-                Extension: filepath.Ext(path),
-                ParentDirectory: filepath.Dir(path),
-                Size: fileInfo.Size(),
-                IsDirectory: fileInfo.IsDir(),
-                CreatedDate: fileInfo.ModTime().Unix(),
-                PopulatedDate: time.Now().Unix(),
-            }
-            db.Create(&folder)
+        file := models.File{
+            ID: id,
+            Name: fileInfo.Name(),
+            Path: path,
+            Extension: filepath.Ext(path),
+            ParentDirectory: filepath.Dir(path),
+            Size: fileInfo.Size(),
+            IsDirectory: fileInfo.IsDir(),
+            CreatedDate: fileInfo.ModTime().Unix(),
+            PopulatedDate: time.Now().Unix(),
         }
+
+        channel <- true
+        go func() {
+            defer func() { <-channel }()
+            db.Create(&file)
+            log.Println("Created file ->", path);
+        }()
 
         return nil
     })
+
+    for i := 0; i < cap(channel); i++ {
+        channel <- true
+    }
 
     return nil
 } 
