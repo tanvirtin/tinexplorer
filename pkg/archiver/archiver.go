@@ -21,6 +21,8 @@ func getDbPath() string {
 }
 
 func Archive(rootPath string) error {
+    start := time.Now()
+
     pathToDb := getDbPath()
     os.Remove(pathToDb);
 
@@ -34,7 +36,8 @@ func Archive(rootPath string) error {
  
     var id uint64 = 0
     channel := make(chan bool, 100)
-    filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
+    
+    err = filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
@@ -63,9 +66,17 @@ func Archive(rootPath string) error {
         return nil
     })
 
+    if err != nil {
+        return err
+    }
+
     for i := 0; i < cap(channel); i++ {
         channel <- true
     }
+
+    elapsed := time.Since(start)
+
+    log.Printf("Archive took %s", elapsed)
 
     return nil
 } 
