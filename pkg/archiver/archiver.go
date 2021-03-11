@@ -1,13 +1,14 @@
 package archiver
 
 import (
-    "database/sql"
 	"fmt"
     "path/filepath"
     "os"
     "path"
     "runtime"
-    _ "github.com/mattn/go-sqlite3"
+    "gorm.io/gorm"
+    "gorm.io/driver/sqlite"
+    "github.com/tanvirtin/tinexplorer/api/models"
 )
 
 func getRootDir() string {
@@ -22,35 +23,12 @@ func InitializeDatabase() error {
 
     os.Remove(pathToDb);
 
-    db, err := sql.Open("sqlite3", pathToDb)
-
-    if err != nil {
+    if db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{}); err != nil {
         return err
+    } else {
+        db.AutoMigrate(&models.File{})
     }
-
-    statement, err := db.Prepare(`
-        CREATE TABLE IF NOT EXISTS file 
-        (
-            id INTEGER PRIMARY KEY, 
-            name TEXT,
-            path TEXT UNIQUE,
-            extension TEXT NOT NULL,
-            isDirectory INTEGER,
-            parentDirectory TEXT,
-            size INTEGER,
-            createdDate TEXT NOT NULL,
-            populatedDate TEXT NOT NULL
-        )
-    `)
-    
-    if err != nil {
-        return err
-    }
-
-    if _, err := statement.Exec(); err != nil {
-        return err
-    }
-    
+   
     return nil
 }
 

@@ -2,7 +2,9 @@ module github.com/tanvirtin/tinexplorer
 
 require (
 	github.com/akamensky/argparse v1.2.2
-	github.com/mattn/go-sqlite3 v1.14.6
+	github.com/mattn/go-sqlite3 v1.14.6 // indirect
+	gorm.io/driver/sqlite v1.1.4
+	gorm.io/gorm v1.21.3
 )
 
 go 1.15
