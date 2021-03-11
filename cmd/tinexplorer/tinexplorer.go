@@ -17,9 +17,6 @@ func main() {
     path, err := args.GetPath()
     checkErr(err)
 
-    err = archiver.InitializeDatabase()
-    checkErr(err)
-
     err = archiver.Archive(path);
     checkErr(err)
 }

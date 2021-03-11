@@ -11,7 +11,7 @@ type Args struct {
 }
 
 func New() *Args {
-    return &Args { parser: argparse.NewParser("tinexplorer", "Filesystem GraphQL API ☁️")}
+    return &Args{parser: argparse.NewParser("tinexplorer", "Filesystem GraphQL API ☁️")}
 }
 
 func (args *Args) GetPath() (string, error) {

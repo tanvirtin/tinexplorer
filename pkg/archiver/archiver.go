@@ -9,39 +9,59 @@ import (
     "gorm.io/gorm"
     "gorm.io/driver/sqlite"
     "github.com/tanvirtin/tinexplorer/api/models"
+    "time"
 )
 
-func getRootDir() string {
+func Archive(rootPath string) error {
     _, b, _, _ := runtime.Caller(0)
     d := path.Join(path.Dir(b))
-    return filepath.Dir(d)
-}
-
-func InitializeDatabase() error {
-    rootDir := getRootDir();
+    rootDir := filepath.Dir(d)
     pathToDb := filepath.Join(rootDir, "../assets/tinexplore.db")
 
     os.Remove(pathToDb);
 
-    if db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{}); err != nil {
+    db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{})
+    
+    if err != nil {
         return err
-    } else {
-        db.AutoMigrate(&models.File{})
     }
-   
-    return nil
-}
-
-func Archive(path string) error {
-    filepath.Walk(path, func (path string, fileInfo os.FileInfo, err error) error {
+        
+    db.AutoMigrate(&models.File{})
+ 
+    var id uint64 = 0
+    filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
 
+        id += 1
+
         if (fileInfo.IsDir()) {
-            fmt.Printf("File -> %s -> %+v\n\n", path, fileInfo)
+            file := models.File{
+                ID: id,
+                Name: fileInfo.Name(),
+                Path: path,
+                Extension: filepath.Ext(path),
+                ParentDirectory: filepath.Dir(path),
+                Size: fileInfo.Size(),
+                IsDirectory: fileInfo.IsDir(),
+                CreatedDate: fileInfo.ModTime().Unix(),
+                PopulatedDate: time.Now().Unix(),
+            }
+            db.Create(&file)
         } else {
-            fmt.Printf("Directory -> %s -> %+v\n\n", path, fileInfo)
+             folder := models.File{
+                ID: id,
+                Name: fileInfo.Name(),
+                Path: path,
+                Extension: filepath.Ext(path),
+                ParentDirectory: filepath.Dir(path),
+                Size: fileInfo.Size(),
+                IsDirectory: fileInfo.IsDir(),
+                CreatedDate: fileInfo.ModTime().Unix(),
+                PopulatedDate: time.Now().Unix(),
+            }
+            db.Create(&folder)
         }
 
         return nil
