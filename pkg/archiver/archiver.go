@@ -1,15 +1,17 @@
 package archiver
 
 import (
-    "path/filepath"
     "os"
+    "log"
+	"fmt"
     "path"
+    "time"
     "runtime"
     "gorm.io/gorm"
+    "path/filepath"
+    "gorm.io/gorm/logger"
     "gorm.io/driver/sqlite"
     "github.com/tanvirtin/tinexplorer/api/models"
-    "time"
-    "log"
 )
 
 func getDbPath() string {
@@ -20,22 +22,46 @@ func getDbPath() string {
     return pathToDb
 }
 
-func Archive(rootPath string) error {
-    start := time.Now()
-
+func createDb() (*gorm.DB, error) {
     pathToDb := getDbPath()
     os.Remove(pathToDb);
 
-    db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{})
+	newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold: time.Second,
+			LogLevel: logger.Silent,
+			Colorful: false,
+		},
+	)
+
+    db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{ Logger: newLogger })
     
     if err != nil {
-        return err
+        return nil, err
     }
         
     db.AutoMigrate(&models.File{})
- 
+    
+    return db, nil
+}
+
+func Archive(rootPath string) error {
+    start := time.Now()
+
+    db, err := createDb()
+
+    if err != nil {
+        return nil
+    }
+
     var id uint64 = 0
-    channel := make(chan bool, 100)
+	totalInsertedRecords := 0
+    concurrency := 100
+    batchSize := 500
+    channel := make(chan bool, concurrency)
+
+    files := []models.File{}
     
     err = filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
@@ -56,12 +82,20 @@ func Archive(rootPath string) error {
             PopulatedDate: time.Now().Unix(),
         }
 
-        channel <- true
-        go func() {
-            defer func() { <-channel }()
-            db.Create(&file)
-            log.Println("Created file ->", path);
-        }()
+        if len(files) > batchSize {
+            channel <- true
+            go func() {
+                defer func() {
+					<-channel
+					totalInsertedRecords += batchSize
+					fmt.Println("Total records inserted -> ", totalInsertedRecords)
+				}()
+                db.CreateInBatches(files, batchSize)
+            }()
+            files = []models.File{}
+        }
+
+        files = append(files, file);
 
         return nil
     })
@@ -69,6 +103,16 @@ func Archive(rootPath string) error {
     if err != nil {
         return err
     }
+
+    channel <- true
+    go func() {
+		defer func() {
+			<-channel
+			totalInsertedRecords += batchSize
+			fmt.Println("Total records inserted -> ", totalInsertedRecords)
+		}()
+        db.CreateInBatches(files, batchSize)
+    }()
 
     for i := 0; i < cap(channel); i++ {
         channel <- true
