@@ -4,6 +4,7 @@ import (
     "log"
     "github.com/tanvirtin/tinexplorer/pkg/archiver"
     "github.com/tanvirtin/tinexplorer/internal/args"
+    "github.com/tanvirtin/tinexplorer/internal/db"
 )
 
 func checkErr(err error) {
@@ -13,10 +14,14 @@ func checkErr(err error) {
 }
 
 func main() {
+    db, err := db.Create()
+    checkErr(err)
+
     args := args.New();
     path, err := args.GetPath()
     checkErr(err)
 
-    err = archiver.Archive(path);
+    archiver := archiver.New(db, 10000, true)
+    err = archiver.Archive(path)
     checkErr(err)
 }

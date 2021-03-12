@@ -1,14 +1,14 @@
-package models
+package file
 
 import (
     "gorm.io/gorm"
 )
 
-type File struct {
+type Model struct {
     gorm.Model
     ID uint64 `gorm:"primaryKey"`
-    Name string 
     Path string `gorm:"unique"`
+    Name string 
     Extension string
     ParentDirectory string
     Size int64

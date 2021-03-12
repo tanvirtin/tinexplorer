@@ -1,49 +1,27 @@
 package archiver
 
 import (
-    "os"
-    "log"
-    "path"
-    "time"
-    "runtime"
-    "gorm.io/gorm"
-    "path/filepath"
-    "gorm.io/gorm/logger"
-    "gorm.io/driver/sqlite"
-    "github.com/tanvirtin/tinexplorer/api/models"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/tanvirtin/tinexplorer/internal/file"
+	"gorm.io/gorm"
 )
 
-func getDbPath() string {
-    _, b, _, _ := runtime.Caller(0)
-    d := path.Join(path.Dir(b))
-    rootDir := filepath.Dir(d)
-    pathToDb := filepath.Join(rootDir, "../assets/tinexplore.db")
-    return pathToDb
+type Archiver struct {
+    fileRepository *file.Repository
+    debug bool
 }
 
-func createDb() (*gorm.DB, error) {
-    pathToDb := getDbPath()
-    os.Remove(pathToDb);
-
-	newLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold: time.Second,
-			LogLevel: logger.Silent,
-			Colorful: false,
-		},
-	)
-
-    if db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{ Logger: newLogger }); err != nil {
-        return nil, err
-    } else {
-        db.AutoMigrate(&models.File{})
-        return db, nil
-    }
+func New(db *gorm.DB, batchSize int, debug bool) *Archiver {
+    return &Archiver { fileRepository: file.NewRepository(db, batchSize), debug: debug }
 }
 
-func createFileModel(id uint64, path string, fileInfo os.FileInfo) models.File {
-    return models.File{
+func createFileModel(id uint64, path string, fileInfo os.FileInfo) file.Model {
+    return file.Model{
         ID: id,
         Name: fileInfo.Name(),
         Path: path,
@@ -56,43 +34,43 @@ func createFileModel(id uint64, path string, fileInfo os.FileInfo) models.File {
     }
 }
 
-func Archive(rootPath string) error {
+func (a Archiver) log(str string) {
+    if a.debug {
+        log.Println(str)
+    }
+}
+
+func (a Archiver) Archive(rootPath string) error {
+    a.log(fmt.Sprintf("Archiving path: %s", rootPath))
+
+    start := time.Now()
     var runningId uint64 = 0
     const concurrency int = 250
-    const batchSize int = 10000
 	totalInsertedRecords := 0
-    files := []models.File{}
     channel := make(chan bool, concurrency)
 
-    db, err := createDb()
-
-    if err != nil {
-        return nil
-    }
-
-    err = filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
+    err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
 
         runningId++
 
-        file := createFileModel(runningId, path, fileInfo)
+        fileModel := createFileModel(runningId, path, fileInfo)
 
-        if len(files) > batchSize {
+        if !a.fileRepository.Push(fileModel) {
+            fileModels := a.fileRepository.Flush()
             channel <- true
             go func() {
                 defer func() {
 					<-channel
-					totalInsertedRecords += batchSize
-                    log.Println("Records archived:", totalInsertedRecords)
+					totalInsertedRecords += len(fileModels)
+                    a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
 				}()
-                db.CreateInBatches(files, batchSize)
+                a.fileRepository.BulkInsert(fileModels)
             }()
-            files = []models.File{}
+            a.fileRepository.Push(fileModel)
         }
-
-        files = append(files, file);
 
         return nil
     })
@@ -101,20 +79,26 @@ func Archive(rootPath string) error {
         return err
     }
 
-    channel <- true
-    go func() {
-		defer func() {
-			<-channel
-			totalInsertedRecords += len(files)
-		}()
-        db.CreateInBatches(files, batchSize)
-    }()
+    fileModels := a.fileRepository.Flush()
+    numRemainingModels := len(fileModels)
+
+    if numRemainingModels > 0 {
+        channel <- true
+        go func() {
+            defer func() {
+                <-channel
+                totalInsertedRecords += numRemainingModels
+            }()
+            a.fileRepository.BulkInsert(fileModels)
+        }()     
+    }
 
     for i := 0; i < cap(channel); i++ {
         channel <- true
     }
 
-    log.Println("Records archived:", totalInsertedRecords)
+    a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
+    a.log(fmt.Sprintf("Archive took: %v", time.Since(start)))
 
     return nil
-} 
+}
