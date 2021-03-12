@@ -34,22 +34,35 @@ func createDb() (*gorm.DB, error) {
 		},
 	)
 
-    db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{ Logger: newLogger })
-    
-    if err != nil {
+    if db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{ Logger: newLogger }); err != nil {
         return nil, err
+    } else {
+        db.AutoMigrate(&models.File{})
+        return db, nil
     }
-        
-    db.AutoMigrate(&models.File{})
-    
-    return db, nil
+}
+
+func createFileModel(id uint64, path string, fileInfo os.FileInfo) models.File {
+    return models.File{
+        ID: id,
+        Name: fileInfo.Name(),
+        Path: path,
+        Extension: filepath.Ext(path),
+        ParentDirectory: filepath.Dir(path),
+        Size: fileInfo.Size(),
+        IsDirectory: fileInfo.IsDir(),
+        CreatedDate: fileInfo.ModTime().Unix(),
+        PopulatedDate: time.Now().Unix(),
+    }
 }
 
 func Archive(rootPath string) error {
-    start := time.Now()
-
+    var runningId uint64 = 0
     const concurrency int = 250
     const batchSize int = 10000
+	totalInsertedRecords := 0
+    files := []models.File{}
+    channel := make(chan bool, concurrency)
 
     db, err := createDb()
 
@@ -57,30 +70,14 @@ func Archive(rootPath string) error {
         return nil
     }
 
-    var id uint64 = 0
-	totalInsertedRecords := 0
-    channel := make(chan bool, concurrency)
-
-    files := []models.File{}
-    
     err = filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
 
-        id++
+        runningId++
 
-        file := models.File{
-            ID: id,
-            Name: fileInfo.Name(),
-            Path: path,
-            Extension: filepath.Ext(path),
-            ParentDirectory: filepath.Dir(path),
-            Size: fileInfo.Size(),
-            IsDirectory: fileInfo.IsDir(),
-            CreatedDate: fileInfo.ModTime().Unix(),
-            PopulatedDate: time.Now().Unix(),
-        }
+        file := createFileModel(runningId, path, fileInfo)
 
         if len(files) > batchSize {
             channel <- true
@@ -88,7 +85,7 @@ func Archive(rootPath string) error {
                 defer func() {
 					<-channel
 					totalInsertedRecords += batchSize
-					log.Println("Total records inserted ->", totalInsertedRecords)
+                    log.Println("Records archived:", totalInsertedRecords)
 				}()
                 db.CreateInBatches(files, batchSize)
             }()
@@ -109,7 +106,6 @@ func Archive(rootPath string) error {
 		defer func() {
 			<-channel
 			totalInsertedRecords += len(files)
-			log.Println("Total records inserted ->", totalInsertedRecords)
 		}()
         db.CreateInBatches(files, batchSize)
     }()
@@ -118,9 +114,7 @@ func Archive(rootPath string) error {
         channel <- true
     }
 
-    elapsed := time.Since(start)
-
-    log.Printf("Archive took %s", elapsed)
+    log.Println("Records archived:", totalInsertedRecords)
 
     return nil
 } 
