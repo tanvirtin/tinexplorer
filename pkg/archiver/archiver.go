@@ -3,7 +3,6 @@ package archiver
 import (
     "os"
     "log"
-	"fmt"
     "path"
     "time"
     "runtime"
@@ -49,6 +48,9 @@ func createDb() (*gorm.DB, error) {
 func Archive(rootPath string) error {
     start := time.Now()
 
+    const concurrency int = 250
+    const batchSize int = 10000
+
     db, err := createDb()
 
     if err != nil {
@@ -57,8 +59,6 @@ func Archive(rootPath string) error {
 
     var id uint64 = 0
 	totalInsertedRecords := 0
-    concurrency := 100
-    batchSize := 500
     channel := make(chan bool, concurrency)
 
     files := []models.File{}
@@ -88,7 +88,7 @@ func Archive(rootPath string) error {
                 defer func() {
 					<-channel
 					totalInsertedRecords += batchSize
-					fmt.Println("Total records inserted -> ", totalInsertedRecords)
+					log.Println("Total records inserted ->", totalInsertedRecords)
 				}()
                 db.CreateInBatches(files, batchSize)
             }()
@@ -108,8 +108,8 @@ func Archive(rootPath string) error {
     go func() {
 		defer func() {
 			<-channel
-			totalInsertedRecords += batchSize
-			fmt.Println("Total records inserted -> ", totalInsertedRecords)
+			totalInsertedRecords += len(files)
+			log.Println("Total records inserted ->", totalInsertedRecords)
 		}()
         db.CreateInBatches(files, batchSize)
     }()
