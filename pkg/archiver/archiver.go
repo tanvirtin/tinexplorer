@@ -49,7 +49,7 @@ func Archive(rootPath string) error {
     start := time.Now()
 
     const concurrency int = 250
-    const batchSize int = 10000
+    const batchSize int = 100000
 
     db, err := createDb()
 
