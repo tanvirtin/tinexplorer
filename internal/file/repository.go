@@ -5,15 +5,18 @@ import "gorm.io/gorm"
 type Repository struct {
     db *gorm.DB
     batchSize int
-    buffer []Model
+    buffer []File
 }
 
 func NewRepository(db *gorm.DB, batchSize int) *Repository {
-    db.AutoMigrate(&Model{})
-    return &Repository{ db: db, batchSize: batchSize, buffer: []Model{} }
+    return &Repository{ db: db, batchSize: batchSize, buffer: []File{} }
 }
 
-func (r *Repository) Push(model Model) bool {
+func (r *Repository) Sync() {
+    r.db.AutoMigrate(&File{})
+}
+
+func (r *Repository) Push(model File) bool {
     if (len(r.buffer) == r.batchSize) {
         return false
     }
@@ -21,12 +24,15 @@ func (r *Repository) Push(model Model) bool {
     return true
 }
 
-func (r *Repository) Flush() []Model {
+func (r *Repository) Flush() []File {
     flushedBuffer := r.buffer
-    r.buffer = []Model{}
+    r.buffer = []File{}
     return flushedBuffer
 }
 
-func (r *Repository) BulkInsert(models []Model) {
-    r.db.CreateInBatches(models, len(models))
+func (r *Repository) BulkInsert(models []File) error {
+    if result := r.db.CreateInBatches(models, len(models)); result.Error != nil {
+        return result.Error;
+    } 
+    return nil 
 }

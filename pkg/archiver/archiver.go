@@ -1,14 +1,13 @@
 package archiver
 
 import (
+	"os"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
-
-	"github.com/tanvirtin/tinexplorer/internal/file"
 	"gorm.io/gorm"
+	"path/filepath"
+	"github.com/tanvirtin/tinexplorer/internal/file"
 )
 
 type Archiver struct {
@@ -17,11 +16,13 @@ type Archiver struct {
 }
 
 func New(db *gorm.DB, batchSize int, debug bool) *Archiver {
-    return &Archiver { fileRepository: file.NewRepository(db, batchSize), debug: debug }
+    fileRepository := file.NewRepository(db, batchSize)
+    fileRepository.Sync()
+    return &Archiver { fileRepository: fileRepository, debug: debug }
 }
 
-func createFileModel(id uint64, path string, fileInfo os.FileInfo) file.Model {
-    return file.Model{
+func createFileFile(id uint64, path string, fileInfo os.FileInfo) file.File {
+    return file.File{
         ID: id,
         Name: fileInfo.Name(),
         Path: path,
@@ -47,7 +48,7 @@ func (a Archiver) Archive(rootPath string) error {
     var runningId uint64 = 0
     const concurrency int = 250
 	totalInsertedRecords := 0
-    channel := make(chan bool, concurrency)
+    channel := make(chan error, concurrency)
 
     err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
@@ -56,20 +57,20 @@ func (a Archiver) Archive(rootPath string) error {
 
         runningId++
 
-        fileModel := createFileModel(runningId, path, fileInfo)
+        fileFile := createFileFile(runningId, path, fileInfo)
 
-        if !a.fileRepository.Push(fileModel) {
-            fileModels := a.fileRepository.Flush()
-            channel <- true
+        if !a.fileRepository.Push(fileFile) {
+            fileFiles := a.fileRepository.Flush()
             go func() {
                 defer func() {
-					<-channel
-					totalInsertedRecords += len(fileModels)
+					<- channel
+					totalInsertedRecords += len(fileFiles)
                     a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
 				}()
-                a.fileRepository.BulkInsert(fileModels)
+                err := a.fileRepository.BulkInsert(fileFiles)
+                channel <- err
             }()
-            a.fileRepository.Push(fileModel)
+            a.fileRepository.Push(fileFile)
         }
 
         return nil
@@ -79,25 +80,25 @@ func (a Archiver) Archive(rootPath string) error {
         return err
     }
 
-    fileModels := a.fileRepository.Flush()
-    numRemainingModels := len(fileModels)
+    fileFiles := a.fileRepository.Flush()
+    numRemainingFiles := len(fileFiles)
 
-    if numRemainingModels > 0 {
-        channel <- true
+    if numRemainingFiles > 0 {
         go func() {
             defer func() {
-                <-channel
-                totalInsertedRecords += numRemainingModels
+                <- channel
+                totalInsertedRecords += numRemainingFiles
+                a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
             }()
-            a.fileRepository.BulkInsert(fileModels)
+            err := a.fileRepository.BulkInsert(fileFiles)
+            channel <- err
         }()     
     }
 
     for i := 0; i < cap(channel); i++ {
-        channel <- true
+        channel <- nil
     }
 
-    a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
     a.log(fmt.Sprintf("Archive took: %v", time.Since(start)))
 
     return nil

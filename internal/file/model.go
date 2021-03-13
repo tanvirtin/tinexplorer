@@ -4,7 +4,7 @@ import (
     "gorm.io/gorm"
 )
 
-type Model struct {
+type File struct {
     gorm.Model
     ID uint64 `gorm:"primaryKey"`
     Path string `gorm:"unique"`
