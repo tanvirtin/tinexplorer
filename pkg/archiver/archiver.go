@@ -46,9 +46,7 @@ func (a Archiver) Archive(rootPath string) error {
 
     start := time.Now()
     var runningId uint64 = 0
-    const concurrency int = 250
 	totalInsertedRecords := 0
-    channel := make(chan error, concurrency)
 
     err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
@@ -61,15 +59,12 @@ func (a Archiver) Archive(rootPath string) error {
 
         if !a.fileRepository.Push(fileFile) {
             fileFiles := a.fileRepository.Flush()
-            go func() {
-                defer func() {
-					<- channel
-					totalInsertedRecords += len(fileFiles)
-                    a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
-				}()
-                err := a.fileRepository.BulkInsert(fileFiles)
-                channel <- err
-            }()
+            err := a.fileRepository.BulkInsert(fileFiles)
+            if err != nil {
+                log.Fatal(err)
+            }
+            totalInsertedRecords += len(fileFiles)
+            a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
             a.fileRepository.Push(fileFile)
         }
 
@@ -84,19 +79,12 @@ func (a Archiver) Archive(rootPath string) error {
     numRemainingFiles := len(fileFiles)
 
     if numRemainingFiles > 0 {
-        go func() {
-            defer func() {
-                <- channel
-                totalInsertedRecords += numRemainingFiles
-                a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
-            }()
-            err := a.fileRepository.BulkInsert(fileFiles)
-            channel <- err
-        }()     
-    }
-
-    for i := 0; i < cap(channel); i++ {
-        channel <- nil
+        err := a.fileRepository.BulkInsert(fileFiles)
+        if err != nil {
+            log.Fatal(err)
+        }
+        totalInsertedRecords += numRemainingFiles
+        a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
     }
 
     a.log(fmt.Sprintf("Archive took: %v", time.Since(start)))

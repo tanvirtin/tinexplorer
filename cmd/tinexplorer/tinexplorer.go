@@ -21,7 +21,7 @@ func main() {
     path, err := args.GetPath()
     checkErr(err)
 
-    archiver := archiver.New(db, 10000, true)
+    archiver := archiver.New(db, 2700, true)
     err = archiver.Archive(path)
     checkErr(err)
 }
