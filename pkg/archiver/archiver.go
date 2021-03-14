@@ -59,13 +59,13 @@ func (a Archiver) Archive(rootPath string) error {
 
         if !a.fileRepository.Push(fileFile) {
             fileFiles := a.fileRepository.Flush()
-            err := a.fileRepository.BulkInsert(fileFiles)
-            if err != nil {
+            if err := a.fileRepository.BulkInsert(fileFiles); err != nil {
                 log.Fatal(err)
+            } else {
+                totalInsertedRecords += len(fileFiles)
+                a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
+                a.fileRepository.Push(fileFile)
             }
-            totalInsertedRecords += len(fileFiles)
-            a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
-            a.fileRepository.Push(fileFile)
         }
 
         return nil
@@ -79,12 +79,13 @@ func (a Archiver) Archive(rootPath string) error {
     numRemainingFiles := len(fileFiles)
 
     if numRemainingFiles > 0 {
-        err := a.fileRepository.BulkInsert(fileFiles)
-        if err != nil {
+        fileFiles := a.fileRepository.Flush()
+        if err := a.fileRepository.BulkInsert(fileFiles); err != nil {
             log.Fatal(err)
+        } else {
+            totalInsertedRecords += len(fileFiles)
+            a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
         }
-        totalInsertedRecords += numRemainingFiles
-        a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
     }
 
     a.log(fmt.Sprintf("Archive took: %v", time.Since(start)))
