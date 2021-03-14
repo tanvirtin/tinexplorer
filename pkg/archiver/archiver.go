@@ -12,13 +12,12 @@ import (
 
 type Archiver struct {
     fileRepository *file.Repository
-    debug bool
 }
 
-func New(db *gorm.DB, batchSize int, debug bool) *Archiver {
+func New(db *gorm.DB, batchSize int) *Archiver {
     fileRepository := file.NewRepository(db, batchSize)
     fileRepository.Sync()
-    return &Archiver { fileRepository: fileRepository, debug: debug }
+    return &Archiver { fileRepository: fileRepository }
 }
 
 func createFileFile(id uint64, path string, fileInfo os.FileInfo) file.File {
@@ -35,60 +34,43 @@ func createFileFile(id uint64, path string, fileInfo os.FileInfo) file.File {
     }
 }
 
-func (a Archiver) log(str string) {
-    if a.debug {
-        log.Println(str)
-    }
-}
-
 func (a Archiver) Archive(rootPath string) error {
-    a.log(fmt.Sprintf("Archiving path: %s", rootPath))
+    log.Println(fmt.Sprintf("Archiving path: %s", rootPath))
 
+    count := 0
     start := time.Now()
     var runningId uint64 = 0
-	totalInsertedRecords := 0
 
-    err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
+    if err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
-
         runningId++
-
         fileFile := createFileFile(runningId, path, fileInfo)
 
-        if !a.fileRepository.Push(fileFile) {
-            fileFiles := a.fileRepository.Flush()
-            if err := a.fileRepository.BulkInsert(fileFiles); err != nil {
-                log.Fatal(err)
+        if !a.fileRepository.Accumulate(fileFile) {
+            if files, err := a.fileRepository.Flush(); err != nil {
+                return err
             } else {
-                totalInsertedRecords += len(fileFiles)
-                a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
-                a.fileRepository.Push(fileFile)
+                count += len(files)
+                a.fileRepository.Accumulate(fileFile)
+                log.Println("Archive count:", count)
             }
         }
 
         return nil
-    })
-
-    if err != nil {
+    }); err != nil {
         return err
-    }
-
-    fileFiles := a.fileRepository.Flush()
-    numRemainingFiles := len(fileFiles)
-
-    if numRemainingFiles > 0 {
-        fileFiles := a.fileRepository.Flush()
-        if err := a.fileRepository.BulkInsert(fileFiles); err != nil {
-            log.Fatal(err)
+    } else {
+        if files, err := a.fileRepository.Flush(); err != nil {
+            return err
         } else {
-            totalInsertedRecords += len(fileFiles)
-            a.log(fmt.Sprintf("Records archived: %v", totalInsertedRecords))
+            count += len(files)
+            log.Println("Archive count:", count)
         }
-    }
 
-    a.log(fmt.Sprintf("Archive took: %v", time.Since(start)))
+        log.Println(fmt.Sprintf("Archive took: %v", time.Since(start)))
+    }
 
     return nil
 }

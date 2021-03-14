@@ -16,7 +16,7 @@ func (r *Repository) Sync() {
     r.db.AutoMigrate(&File{})
 }
 
-func (r *Repository) Push(model File) bool {
+func (r *Repository) Accumulate(model File) bool {
     if (len(r.buffer) == r.batchSize) {
         return false
     }
@@ -24,15 +24,13 @@ func (r *Repository) Push(model File) bool {
     return true
 }
 
-func (r *Repository) Flush() []File {
-    flushedBuffer := r.buffer
-    r.buffer = []File{}
-    return flushedBuffer
+func (r *Repository) Flush() ([]File, error) {
+    buffer := r.buffer
+    if result := r.db.CreateInBatches(r.buffer, len(r.buffer)); result.Error != nil {
+        return buffer, result.Error;
+    } else {
+        r.buffer = []File{}
+        return buffer, nil
+    }
 }
 
-func (r *Repository) BulkInsert(models []File) error {
-    if result := r.db.CreateInBatches(models, len(models)); result.Error != nil {
-        return result.Error;
-    } 
-    return nil 
-}
