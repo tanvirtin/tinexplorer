@@ -2,8 +2,6 @@ package archiver
 
 import (
 	"os"
-	"fmt"
-	"log"
 	"time"
 	"gorm.io/gorm"
 	"path/filepath"
@@ -35,10 +33,6 @@ func createFileFile(id uint64, path string, fileInfo os.FileInfo) file.File {
 }
 
 func (a Archiver) Archive(rootPath string) error {
-    log.Println(fmt.Sprintf("Archiving path: %s", rootPath))
-
-    count := 0
-    start := time.Now()
     var runningId uint64 = 0
 
     if err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
@@ -49,12 +43,10 @@ func (a Archiver) Archive(rootPath string) error {
         fileFile := createFileFile(runningId, path, fileInfo)
 
         if !a.fileRepository.Accumulate(fileFile) {
-            if files, err := a.fileRepository.Flush(); err != nil {
+            if _, err := a.fileRepository.Flush(); err != nil {
                 return err
             } else {
-                count += len(files)
                 a.fileRepository.Accumulate(fileFile)
-                log.Println("Archive count:", count)
             }
         }
 
@@ -62,14 +54,9 @@ func (a Archiver) Archive(rootPath string) error {
     }); err != nil {
         return err
     } else {
-        if files, err := a.fileRepository.Flush(); err != nil {
+        if _, err := a.fileRepository.Flush(); err != nil {
             return err
-        } else {
-            count += len(files)
-            log.Println("Archive count:", count)
         }
-
-        log.Println(fmt.Sprintf("Archive took: %v", time.Since(start)))
     }
 
     return nil
