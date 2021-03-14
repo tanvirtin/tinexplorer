@@ -20,9 +20,13 @@ func getDbPath() string {
     return pathToDb
 }
 
+func Destroy() error {
+    pathToDb := getDbPath()
+    return os.Remove(pathToDb);
+}
+
 func Create() (*gorm.DB, error) {
     pathToDb := getDbPath()
-    os.Remove(pathToDb);
 
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),

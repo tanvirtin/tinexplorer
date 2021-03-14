@@ -14,15 +14,20 @@ func checkErr(err error) {
 }
 
 func main() {
-    db, err := db.Create()
-    checkErr(err)
-
     argparser := argparser.New();
     path, err := argparser.GetPath()
     checkErr(err)
 
     if path != "" {
-        archiver := archiver.New(db, 2700)
+        err := db.Destroy()
+        checkErr(err)
+    }
+
+    db, err := db.Create()
+    checkErr(err)
+    archiver := archiver.New(db, 2700)
+
+    if path != "" {
         err = archiver.Archive(path)
         checkErr(err)
     }

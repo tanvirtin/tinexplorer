@@ -18,35 +18,32 @@ func New(db *gorm.DB, batchSize int) *Archiver {
     return &Archiver { fileRepository: fileRepository }
 }
 
-func createFileFile(id uint64, path string, fileInfo os.FileInfo) file.File {
-    return file.File{
-        ID: id,
-        Name: fileInfo.Name(),
-        Path: path,
-        Extension: filepath.Ext(path),
-        ParentDirectory: filepath.Dir(path),
-        Size: fileInfo.Size(),
-        IsDirectory: fileInfo.IsDir(),
-        CreatedDate: fileInfo.ModTime().Unix(),
-        PopulatedDate: time.Now().Unix(),
-    }
-}
+func (a Archiver) Archive(path string) error {
+    var id uint64 = 0
 
-func (a Archiver) Archive(rootPath string) error {
-    var runningId uint64 = 0
-
-    if err := filepath.Walk(rootPath, func (path string, fileInfo os.FileInfo, err error) error {
+    if err := filepath.Walk(path, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
             return err
         }
-        runningId++
-        fileFile := createFileFile(runningId, path, fileInfo)
 
-        if !a.fileRepository.Accumulate(fileFile) {
+        id++
+        file := file.File{
+            ID: id,
+            Name: fileInfo.Name(),
+            Path: path,
+            Extension: filepath.Ext(path),
+            ParentDirectory: filepath.Dir(path),
+            Size: fileInfo.Size(),
+            IsDirectory: fileInfo.IsDir(),
+            CreatedDate: fileInfo.ModTime().Unix(),
+            PopulatedDate: time.Now().Unix(),
+        }
+
+        if !a.fileRepository.Accumulate(file) {
             if _, err := a.fileRepository.Flush(); err != nil {
                 return err
             } else {
-                a.fileRepository.Accumulate(fileFile)
+                a.fileRepository.Accumulate(file)
             }
         }
 

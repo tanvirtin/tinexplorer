@@ -34,3 +34,11 @@ func (r *Repository) Flush() ([]File, error) {
     }
 }
 
+func (r *Repository) FindByParentDirectory(directory string) ([]File, error) {
+    files := []File{}
+    if result := r.db.Where(&File{ ParentDirectory: directory }).Find(&files); result.Error != nil {
+        return nil, result.Error
+    } else {
+        return files, nil
+    }
+}
