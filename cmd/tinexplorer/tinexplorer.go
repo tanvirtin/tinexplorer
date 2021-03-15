@@ -18,22 +18,29 @@ func main() {
     argparser := argparser.New();
     path, err := argparser.GetPath()
     checkErr(err)
-
+ 
     if path != "" {
-        err := db.Destroy()
+        if db.Exists() {
+            err = db.Destroy()
+            checkErr(err)
+        }
+        gormDB, err := db.Instance()
         checkErr(err)
-    }
-
-    db, err := db.Create()
-    checkErr(err)
-    archiver := archiver.New(db, 2700)
-
-    if path != "" {
+        archiver := archiver.New(gormDB, 2500)
         err = archiver.Archive(path)
         checkErr(err)
+    } 
+
+    if db.Exists() {
+        gormDB, err := db.Instance()
+        checkErr(err)
+        service := file.NewService(gormDB);
+        if files, err := service.Find("/home/tanvirtin/workspace/tinexplorer/go.mod"); err != nil {
+            log.Fatal(err)
+        } else {
+            log.Println(files)
+        }
+    } else {
+        log.Fatal("Database does not exist")
     }
-
-    service := file.NewService(db);
-
-    log.Println(service.Find("/home/tanvirtin/workspace/tinexplorer/go.mod"))
 }

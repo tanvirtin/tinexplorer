@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"os"
+    "log"
 	"time"
 	"gorm.io/gorm"
 	"path/filepath"
@@ -20,6 +21,7 @@ func New(db *gorm.DB, batchSize int) *Archiver {
 
 func (a Archiver) Archive(path string) error {
     var id uint64 = 0
+    var count int = 0
 
     if err := filepath.Walk(path, func (path string, fileInfo os.FileInfo, err error) error {
         if err != nil {
@@ -40,19 +42,24 @@ func (a Archiver) Archive(path string) error {
         }
 
         if !a.fileRepository.Accumulate(file) {
-            if _, err := a.fileRepository.Flush(); err != nil {
+            if files, err := a.fileRepository.Flush(); err != nil {
                 return err
             } else {
-                a.fileRepository.Accumulate(file)
+                count += len(files)
+                log.Println("Records achived:", count)
             }
+            a.fileRepository.Accumulate(file)
         }
 
         return nil
     }); err != nil {
         return err
     } else {
-        if _, err := a.fileRepository.Flush(); err != nil {
+        if files, err := a.fileRepository.Flush(); err != nil {
             return err
+        } else {
+            count += len(files)
+            log.Println("Records archived:", count)
         }
     }
 

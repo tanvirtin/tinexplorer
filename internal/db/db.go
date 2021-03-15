@@ -20,12 +20,19 @@ func getDbPath() string {
     return pathToDb
 }
 
+func Exists() bool {
+    if _, err := os.Stat(getDbPath()); os.IsNotExist(err) {
+        return false
+    }
+    return true
+}
+
 func Destroy() error {
     pathToDb := getDbPath()
     return os.Remove(pathToDb);
 }
 
-func Create() (*gorm.DB, error) {
+func Instance() (*gorm.DB, error) {
     pathToDb := getDbPath()
 
 	newLogger := logger.New(
