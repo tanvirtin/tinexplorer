@@ -1,9 +1,6 @@
 package file
 
-import (
-	"fmt"
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 type Repository struct {
     db *gorm.DB
@@ -48,7 +45,16 @@ func (r *Repository) FindByParentDirectory(directory string) ([]File, error) {
 
 func (r *Repository) QueryByPath(path string) ([]File, error) {
     files := []File{}
-    if result := r.db.Raw(fmt.Sprintf("SELECT * FROM files WHERE path GLOB '%s'", path)).Scan(&files); result.Error != nil {
+    if result := r.db.Where("path GLOB ?", path).Find(&files); result.Error != nil {
+        return nil, result.Error
+    } else {
+        return files, nil
+    }
+}
+
+func (r *Repository) SearchByName(text string) ([]File, error) {
+    files := []File{}
+    if result := r.db.Where("name LIKE ?", text).Find(&files); result.Error != nil {
         return nil, result.Error
     } else {
         return files, nil

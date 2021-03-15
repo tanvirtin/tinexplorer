@@ -20,3 +20,7 @@ func (s *Service) Ls(path string) ([]File, error) {
 func (s *Service) Find(path string) ([]File, error) {
     return s.repository.QueryByPath(fmt.Sprintf("%s*", path))
 }
+
+func (s *Service) Search(text string) ([]File, error) {
+    return s.repository.SearchByName(fmt.Sprintf("%%%s%%", text))
+}

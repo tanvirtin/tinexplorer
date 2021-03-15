@@ -5,6 +5,7 @@ import (
     "log"
     "path"
     "time"
+    "errors"
     "runtime"
     "gorm.io/gorm"
     "path/filepath"
@@ -20,21 +21,14 @@ func getDbPath() string {
     return pathToDb
 }
 
-func Exists() bool {
-    if _, err := os.Stat(getDbPath()); os.IsNotExist(err) {
+func dbExists(path string) bool {
+    if _, err := os.Stat(path); os.IsNotExist(err) {
         return false
     }
     return true
 }
 
-func Destroy() error {
-    pathToDb := getDbPath()
-    return os.Remove(pathToDb);
-}
-
-func Instance() (*gorm.DB, error) {
-    pathToDb := getDbPath()
-
+func openDb(path string) (*gorm.DB, error) {
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
@@ -44,9 +38,36 @@ func Instance() (*gorm.DB, error) {
 		},
 	)
 
-    if db, err := gorm.Open(sqlite.Open(pathToDb), &gorm.Config{ Logger: newLogger }); err != nil {
+    if db, err := gorm.Open(sqlite.Open(path), &gorm.Config{ Logger: newLogger }); err != nil {
         return nil, err
     } else {
         return db, nil
     }
+}
+
+func Create() (*gorm.DB, error) {
+    path := getDbPath()
+
+    if dbExists(path) {
+        err := Destroy()
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return openDb(path)
+}
+
+func Instance() (*gorm.DB, error) {
+    path := getDbPath()
+
+    if !dbExists(path) {
+        return nil, errors.New("Database does not exist") 
+    }
+
+    return openDb(path)
+}
+
+func Destroy() error {
+    return os.Remove(getDbPath());
 }
