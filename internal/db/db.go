@@ -1,31 +1,31 @@
 package db
 
 import (
-    "os"
-    "log"
-    "path"
-    "time"
-    "errors"
-    "runtime"
-    "gorm.io/gorm"
-    "path/filepath"
-    "gorm.io/gorm/logger"
-    "gorm.io/driver/sqlite"
+	"errors"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"log"
+	"os"
+	"path"
+	"path/filepath"
+	"runtime"
+	"time"
 )
 
 func getDbPath() string {
-    _, b, _, _ := runtime.Caller(0)
-    d := path.Join(path.Dir(b))
-    rootDir := filepath.Dir(d)
-    pathToDb := filepath.Join(rootDir, "../assets/tinexplorer.db")
-    return pathToDb
+	_, b, _, _ := runtime.Caller(0)
+	d := path.Join(path.Dir(b))
+	rootDir := filepath.Dir(d)
+	pathToDb := filepath.Join(rootDir, "../assets/tinexplorer.db")
+	return pathToDb
 }
 
 func dbExists(path string) bool {
-    if _, err := os.Stat(path); os.IsNotExist(err) {
-        return false
-    }
-    return true
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 func openDb(path string) (*gorm.DB, error) {
@@ -33,41 +33,41 @@ func openDb(path string) (*gorm.DB, error) {
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
 			SlowThreshold: time.Second,
-			LogLevel: logger.Silent,
-			Colorful: false,
+			LogLevel:      logger.Silent,
+			Colorful:      false,
 		},
 	)
 
-    if db, err := gorm.Open(sqlite.Open(path), &gorm.Config{ Logger: newLogger }); err != nil {
-        return nil, err
-    } else {
-        return db, nil
-    }
+	if db, err := gorm.Open(sqlite.Open(path), &gorm.Config{Logger: newLogger}); err != nil {
+		return nil, err
+	} else {
+		return db, nil
+	}
 }
 
 func Create() (*gorm.DB, error) {
-    path := getDbPath()
+	path := getDbPath()
 
-    if dbExists(path) {
-        err := Destroy()
-        if err != nil {
-            return nil, err
-        }
-    }
+	if dbExists(path) {
+		err := Destroy()
+		if err != nil {
+			return nil, err
+		}
+	}
 
-    return openDb(path)
+	return openDb(path)
 }
 
 func Instance() (*gorm.DB, error) {
-    path := getDbPath()
+	path := getDbPath()
 
-    if !dbExists(path) {
-        return nil, errors.New("Database does not exist") 
-    }
+	if !dbExists(path) {
+		return nil, errors.New("Database does not exist")
+	}
 
-    return openDb(path)
+	return openDb(path)
 }
 
 func Destroy() error {
-    return os.Remove(getDbPath());
+	return os.Remove(getDbPath())
 }
