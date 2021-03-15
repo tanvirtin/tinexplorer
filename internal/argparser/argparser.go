@@ -1,9 +1,6 @@
 package argparser
 
-import (
-	"flag"
-	"path/filepath"
-)
+import "flag"
 
 type Args struct {
 	path *string
@@ -17,13 +14,6 @@ func New() *Args {
 	return &args
 }
 
-func (a *Args) GetPath() (string, error) {
-	if *a.path == "" {
-		return "", nil
-	}
-	if absPath, err := filepath.Abs(*a.path); err != nil {
-		return "", err
-	} else {
-		return absPath, nil
-	}
+func (a *Args) GetPath() string {
+    return *a.path
 }

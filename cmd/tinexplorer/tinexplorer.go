@@ -15,8 +15,7 @@ func checkErr(err error) {
 
 func main() {
 	argparser := argparser.New()
-	path, err := argparser.GetPath()
-	checkErr(err)
+	path := argparser.GetPath()
 
 	if path != "" {
 		gormDB, err := db.Create()

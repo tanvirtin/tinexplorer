@@ -46,7 +46,7 @@ func (a Archiver) Archive(path string) error {
 				return err
 			} else {
 				count += len(files)
-				log.Println("Records achived:", count)
+				log.Println("Records archived:", count)
 			}
 			a.fileRepository.Accumulate(file)
 		}
