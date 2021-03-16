@@ -1,49 +1,48 @@
 package server
 
 import (
-    "log"
-    "fmt"
-    "net/http"
+	"fmt"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+	"github.com/tanvirtin/tinexplorer/internal/file"
+	"gorm.io/gorm"
+	"log"
+	"net/http"
 )
 
 type Server struct {
-    host string
-    port int
+	db   *gorm.DB
+	host string
+	port int
 }
 
-func New(host string, port int) *Server {
-    return &Server{host: host, port: port}
+func New(db *gorm.DB, host string, port int) *Server {
+	return &Server{db: db, host: host, port: port}
+}
+
+func (s *Server) configureGraphqlResolvers() graphql.Fields {
+	fileResolver := file.NewResolver(s.db)
+	return graphql.Fields{
+		"ls": fileResolver.Ls(),
+	}
 }
 
 func (s *Server) Serve() error {
-	fields := graphql.Fields{
-		"ls": &graphql.Field{
-			Type: graphql.String,
-			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				return "directories", nil
-			},
-		},
-	}
-	rootQuery := graphql.ObjectConfig{Name: "RootQuery", Fields: fields}
+	rootQuery := graphql.ObjectConfig{Name: "RootQuery", Fields: s.configureGraphqlResolvers()}
 	schemaConfig := graphql.SchemaConfig{Query: graphql.NewObject(rootQuery)}
 	schema, err := graphql.NewSchema(schemaConfig)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
 	http.Handle("/graphql", handler.New(&handler.Config{
-		Schema:   &schema,
-		Pretty:   true,
-		GraphiQL: false,
-        Playground: true,
+		Schema:     &schema,
+		Pretty:     true,
+		GraphiQL:   false,
+		Playground: true,
 	}))
 
-
-    log.Printf("Server started on http://%s:%v", s.host, s.port)
-	http.ListenAndServe(fmt.Sprintf("%s:%v", s.host, s.port), nil)
-    
-    return nil
+	log.Printf("Starting server on http://%s:%v", s.host, s.port)
+	return http.ListenAndServe(fmt.Sprintf("%s:%v", s.host, s.port), nil)
 }

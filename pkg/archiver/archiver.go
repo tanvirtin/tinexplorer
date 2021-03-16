@@ -19,9 +19,37 @@ func New(db *gorm.DB, batchSize int) *Archiver {
 	return &Archiver{fileRepository: fileRepository}
 }
 
+func createFile(id uint64, path string, fileInfo os.FileInfo) (*file.File, error) {
+	parentDirectory, err := filepath.Abs(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	filePath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	if filePath == parentDirectory {
+		return nil, nil
+	}
+	return &file.File{
+		ID:              id,
+		Name:            fileInfo.Name(),
+		Path:            filePath,
+		Extension:       filepath.Ext(path),
+		ParentDirectory: parentDirectory,
+		Size:            fileInfo.Size(),
+		IsDirectory:     fileInfo.IsDir(),
+		CreatedDate:     fileInfo.ModTime().Unix(),
+		PopulatedDate:   time.Now().Unix(),
+	}, nil
+}
+
 func (a Archiver) Archive(path string) error {
+	var startTime time.Time = time.Now()
 	var id uint64 = 0
 	var count int = 0
+
+	log.Printf("Archiving all files from path: %s", path)
 
 	if err := filepath.Walk(path, func(path string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
@@ -29,26 +57,24 @@ func (a Archiver) Archive(path string) error {
 		}
 
 		id++
-		file := file.File{
-			ID:              id,
-			Name:            fileInfo.Name(),
-			Path:            path,
-			Extension:       filepath.Ext(path),
-			ParentDirectory: filepath.Dir(path),
-			Size:            fileInfo.Size(),
-			IsDirectory:     fileInfo.IsDir(),
-			CreatedDate:     fileInfo.ModTime().Unix(),
-			PopulatedDate:   time.Now().Unix(),
+		file, err := createFile(id, path, fileInfo)
+
+		if file == nil {
+			return nil
 		}
 
-		if !a.fileRepository.Accumulate(file) {
+		if err != nil {
+			return err
+		}
+
+		if !a.fileRepository.Accumulate(*file) {
 			if files, err := a.fileRepository.Flush(); err != nil {
 				return err
 			} else {
 				count += len(files)
 				log.Println("Records archived:", count)
 			}
-			a.fileRepository.Accumulate(file)
+			a.fileRepository.Accumulate(*file)
 		}
 
 		return nil
@@ -62,6 +88,8 @@ func (a Archiver) Archive(path string) error {
 			log.Println("Records archived:", count)
 		}
 	}
+
+	log.Printf("Archiving %s took %s", path, time.Since(startTime))
 
 	return nil
 }
