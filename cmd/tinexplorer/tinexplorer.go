@@ -5,6 +5,7 @@ import (
 	"github.com/tanvirtin/tinexplorer/internal/db"
 	"github.com/tanvirtin/tinexplorer/pkg/archiver"
 	"log"
+    "github.com/tanvirtin/tinexplorer/api/server"
 )
 
 func checkErr(err error) {
@@ -27,4 +28,8 @@ func main() {
 		_, err := db.Instance()
 		checkErr(err)
 	}
+
+    server := server.New("localhost", 8080)
+    err := server.Serve()
+    checkErr(err)
 }
