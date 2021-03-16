@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"net/http"
+    "github.com/rs/cors"
 )
 
 type Server struct {
@@ -36,13 +37,17 @@ func (s *Server) Serve() error {
 		return err
 	}
 
-	http.Handle("/graphql", handler.New(&handler.Config{
+    mux := http.NewServeMux()
+
+	mux.Handle("/graphql", handler.New(&handler.Config{
 		Schema:     &schema,
 		Pretty:     true,
 		GraphiQL:   false,
 		Playground: true,
 	}))
 
+    handler := cors.Default().Handler(mux)
+
 	log.Printf("Starting server on http://%s:%v", s.host, s.port)
-	return http.ListenAndServe(fmt.Sprintf("%s:%v", s.host, s.port), nil)
+	return http.ListenAndServe(fmt.Sprintf("%s:%v", s.host, s.port), handler)
 }
