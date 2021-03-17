@@ -3,7 +3,6 @@ package argparser
 import (
 	"flag"
 	"path/filepath"
-	"strings"
 )
 
 type Args struct {
@@ -20,8 +19,5 @@ func New() *Args {
 
 func (a *Args) GetPath() (string, error) {
 	path := *a.path
-	if strings.Contains(path, "~") {
-		path = strings.ReplaceAll(path, "~", "/home")
-	}
 	return filepath.Abs(path)
 }
