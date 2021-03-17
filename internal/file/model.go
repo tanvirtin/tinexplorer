@@ -13,4 +13,5 @@ type File struct {
 	IsDirectory     bool
 	CreatedDate     int64
 	PopulatedDate   int64
+	Origin          string
 }

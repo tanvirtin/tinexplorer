@@ -26,6 +26,7 @@ func NewResolver(db *gorm.DB) *Resolver {
 					"isDirectory":     &graphql.Field{Type: graphql.Boolean},
 					"createdDate":     &graphql.Field{Type: graphql.Int},
 					"populatedDate":   &graphql.Field{Type: graphql.Int},
+					"origin":          &graphql.Field{Type: graphql.String},
 				},
 			},
 		),

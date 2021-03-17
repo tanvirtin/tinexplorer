@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
-    "strings"
 )
 
 type Archiver struct {
@@ -20,7 +20,7 @@ func New(db *gorm.DB, batchSize int) *Archiver {
 	return &Archiver{fileRepository: fileRepository}
 }
 
-func createFile(id uint64, path string, rootPath string, fileInfo os.FileInfo) (*file.File, error) {
+func createFileModel(id uint64, path string, rootPath string, fileInfo os.FileInfo) (*file.File, error) {
 	parentDirectory, err := filepath.Abs(filepath.Dir(path))
 	if err != nil {
 		return nil, err
@@ -36,8 +36,8 @@ func createFile(id uint64, path string, rootPath string, fileInfo os.FileInfo) (
 		return nil, nil
 	}
 
-    filePath = strings.Replace(filePath, rootPath, ".", 1)
-    parentDirectory = strings.Replace(parentDirectory, rootPath, ".", 1)
+	filePath = strings.Replace(filePath, rootPath, ".", 1)
+	parentDirectory = strings.Replace(parentDirectory, rootPath, ".", 1)
 
 	return &file.File{
 		ID:              id,
@@ -49,6 +49,7 @@ func createFile(id uint64, path string, rootPath string, fileInfo os.FileInfo) (
 		IsDirectory:     fileInfo.IsDir(),
 		CreatedDate:     fileInfo.ModTime().Unix(),
 		PopulatedDate:   time.Now().Unix(),
+		Origin:          rootPath,
 	}, nil
 }
 
@@ -65,7 +66,7 @@ func (a Archiver) Archive(rootPath string) error {
 		}
 
 		id++
-		file, err := createFile(id, path, rootPath, fileInfo)
+		file, err := createFileModel(id, path, rootPath, fileInfo)
 
 		if file == nil {
 			return nil
