@@ -20,7 +20,7 @@ func NewResolver(db *gorm.DB) *Resolver {
 					"id":              &graphql.Field{Type: graphql.Int},
 					"path":            &graphql.Field{Type: graphql.String},
 					"name":            &graphql.Field{Type: graphql.String},
-					"extension":       &graphql.Field{Type: graphql.Boolean},
+					"extension":       &graphql.Field{Type: graphql.String},
 					"parentDirectory": &graphql.Field{Type: graphql.String},
 					"size":            &graphql.Field{Type: graphql.Int},
 					"isDirectory":     &graphql.Field{Type: graphql.Boolean},

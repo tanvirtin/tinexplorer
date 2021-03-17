@@ -14,11 +14,7 @@ func NewService(db *gorm.DB) *Service {
 }
 
 func (s *Service) Ls(path string) ([]File, error) {
-	containsFirstPathDelimiter := string(path[0]) == "/"
 	containsLastPathDelimiter := string(path[len(path)-1]) == "/"
-	if !containsFirstPathDelimiter {
-		path = fmt.Sprintf("/%s", path)
-	}
 	if containsLastPathDelimiter {
 		path = path[0 : len(path)-1]
 	}
